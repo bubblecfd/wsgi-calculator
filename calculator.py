@@ -40,18 +40,63 @@ To submit your homework:
 
 
 """
+import re
+import traceback
+
+def guide():
+    page = """
+    <html>Here's how to use this simple calculator...</html><br><br>
+    To add 23+42, type <a href="/add/23/42">http://localhost:8080/add/23/42<a><br>
+    To subtract 50-17, type <a href="/subtract/50/17">http://localhost:8080/subtract/50/17<a><br>
+    To multiply 20*12, type <a href="/multiply/20/12">http://localhost:8080/multiply/20/12<a><br>
+    To divide 100/5, type <a href="/divide/100/5">http://localhost:8080/divide/100/5<a><br>
+    """
+
+    return page
 
 
 def add(*args):
     """ Returns a STRING with the sum of the arguments """
 
-    # TODO: Fill sum with the correct value, based on the
-    # args provided.
-    sum = "0"
+    page ='{}<br><a href="/">Back to the main page</a>'
+    sum = 0
+    for arg in args:
+        sum += int(arg)
 
-    return sum
+    return page.format(str(sum))
 
-# TODO: Add functions for handling more arithmetic operations.
+
+def subtract(*args):
+    """ Returns a STRING with the subtraction result of the arguments """
+
+    page ='{}<br><a href="/">Back to the main page</a>'
+    result = int(args[0])-int(args[1])
+    
+    return page.format(str(result))
+
+
+def multiply(*args):
+    """ Returns a STRING with the multiplication of the arguments """
+
+    page ='{}<br><a href="/">Back to the main page</a>'
+    result = 1
+    for arg in args:
+        result *= int(arg)
+    
+    return page.format(str(result))
+
+
+def divide(*args):
+    """ Returns a STRING with the division of the arguments """
+
+    page ='{}<br><a href="/">Back to the main page</a>'
+
+    try:  
+        result = int(args[0])/int(args[1])
+        return page.format(str(result))
+    except Exception:
+        return page.format('Error: divided by zero')
+
 
 def resolve_path(path):
     """
@@ -59,26 +104,54 @@ def resolve_path(path):
     arguments.
     """
 
-    # TODO: Provide correct values for func and args. The
-    # examples provide the correct *syntax*, but you should
-    # determine the actual values of func and args using the
-    # path.
-    func = add
-    args = ['25', '32']
+    funcs = {
+        '': guide,
+        'add': add,
+        'subtract': subtract,
+        'multiply': multiply,
+        'divide': divide
+    }
+
+    path = path.strip('/').split('/')
+
+    func_name = path[0]
+    args = path[1:]
+
+    try:
+        func = funcs[func_name]
+    except KeyError:
+        raise NameError
 
     return func, args
 
 def application(environ, start_response):
-    # TODO: Your application code from the book database
-    # work here as well! Remember that your application must
-    # invoke start_response(status, headers) and also return
-    # the body of the response in BYTE encoding.
-    #
     # TODO (bonus): Add error handling for a user attempting
     # to divide by zero.
-    pass
+
+    headers = [('Content-type', 'text/html')]
+
+    try:
+        path = environ.get('PATH_INFO', None)
+        
+        if path is None:
+            raise NameError
+        func, args = resolve_path(path)
+        body = func(*args)
+        status = "200 OK"
+    except NameError:
+        status = "404 Not Found"
+        body = "<h1>Not Found</h1>"
+    except Exception:
+        status = "500 Internal Server Error"
+        body = "<h1>Internal Server Error</h1>"
+        print(traceback.format_exc())
+    finally:
+        headers.append(('Content-length', str(len(body))))
+        start_response(status, headers)
+        return [body.encode('utf8')]
+    
 
 if __name__ == '__main__':
-    # TODO: Insert the same boilerplate wsgiref simple
-    # server creation that you used in the book database.
-    pass
+    from wsgiref.simple_server import make_server
+    srv = make_server('localhost', 8080, application)
+    srv.serve_forever()
